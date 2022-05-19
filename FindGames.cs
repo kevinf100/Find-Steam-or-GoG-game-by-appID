@@ -9,8 +9,21 @@ namespace GamePathFinder
     [SupportedOSPlatform("windows")]
     class SteamGamePath
     {
+        /// <summary>
+        /// Gets the Steam install path using the Registry.
+        /// </summary>
+        /// <returns>
+        /// The path to the Steam install folder.
+        /// Note: This will return null if the the steam Registry is not found.
+        /// </returns>
         public static string? GetSteamPath => ((string?)Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null))?.Replace("/", "\\\\");
         // Paths in Windows are case insensitive, so I don't bother making sure SteamLibraryPaths and this are the same case.
+        /// <summary>
+        /// Gets the Steam library paths.
+        /// </summary>
+        /// <returns>
+        /// Note: This will return null if the the steam Registry is not found.
+        /// </returns>
         public static List<string>? SteamLibraryPaths()
         {
             var libraryfoldersPath = new StringBuilder(GetSteamPath);
@@ -56,7 +69,13 @@ namespace GamePathFinder
             }
             return null; // Game not installed or something is wrong.
         }
-        // I split these up so it looks neater.
+        /// <summary>
+        /// This will attempt to find to find any game with the exact appID given.
+        /// </summary>
+        /// <returns>
+        /// This will return the path to the game's main folder.
+        /// Note: This will return null if the game is not found.
+        /// </returns>
         public static string? FindGameByAppID(string appID)
         {
             var ACFFile = FindGameACFByAppID(appID); // ACF file has the install folder
@@ -78,9 +97,61 @@ namespace GamePathFinder
             }
             return null;
         }
+        /// <summary>
+        /// This will attempt to find to find any game with the exact appID given.
+        /// </summary>
+        /// <returns>
+        /// The path to the game's main folder.
+        /// Note: This will return null if the game is not found.
+        /// </returns>
         public static string? FindGameByAppID(UInt64 appID)
         {
             return FindGameByAppID(appID.ToString());
+        }
+        static string? FindGameACFByName(string name)
+        {
+            var paths = SteamLibraryPaths();
+            if (paths == null)
+                return null;
+            foreach (var path in paths)
+            {
+                var steamappPath = $"{path}\\steamapps\\"; // ACF files are in steamapp folder
+                var filesInPath = Directory.GetFiles(steamappPath, "*.acf");
+                foreach (var file in filesInPath)
+                {
+                    string? installdir = null;
+                    var correctFile = false;
+                    using (var sr = File.OpenText(file))
+                    {
+                        string? currentLine;
+                        while ((currentLine = sr.ReadLine()) != null)
+                        {
+                            if (!correctFile)
+                                correctFile = currentLine.Contains("name") && currentLine.Contains(name);
+                            if (currentLine.Contains("installdir"))
+                            {
+                                string[] currentLineArr = SplitByQuotes(currentLine);
+                                installdir = currentLineArr[1].Trim('\"');
+                            }
+                            if (correctFile && installdir != null)
+                                return string.Concat(file.AsSpan(0, file.LastIndexOf("\\") + 1), installdir);
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+        [Obsolete("Use AppID instead as names can be changed at anytime by the devs or user")]
+        /// <summary>
+        /// This will attempt to find to find any game with the exact name given.
+        /// </summary>
+        /// <returns>
+        /// The path to the game's main folder.
+        /// Note: This will return null if the game is not found.
+        /// </returns>
+        public static string? FindGameByName(string name)
+        {
+            return FindGameACFByName(name);
         }
         static string[] SplitByQuotes(string unsplitArray)
         {
@@ -91,6 +162,13 @@ namespace GamePathFinder
     [SupportedOSPlatform("windows")]
     class GoGGamePath
     {
+        /// <summary>
+        /// This will attempt to find to find any game with the exact appID given.
+        /// </summary>
+        /// <returns>
+        /// The path to the game's main folder.
+        /// Note: This will return null if the game is not found.
+        /// </returns>
         public static string? FindGameByAppID(string appID)
         {
             return (string?)Registry.GetValue($"HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\GOG.com\\Games\\{appID}\\", "Path", null);
